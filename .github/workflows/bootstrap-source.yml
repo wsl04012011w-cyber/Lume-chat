@@ -1,0 +1,44 @@
+name: Bootstrap source from zip
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.bootstrap/lume-source.zip.b64'
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decode and extract zip
+        run: |
+          set -euo pipefail
+          if [ ! -f .bootstrap/lume-source.zip.b64 ]; then
+            echo "Missing .bootstrap/lume-source.zip.b64 — upload the base64 zip first."
+            exit 1
+          fi
+          mkdir -p /tmp/lume-src
+          base64 -d .bootstrap/lume-source.zip.b64 > /tmp/lume-src/src.zip
+          unzip -o /tmp/lume-src/src.zip -d /tmp/lume-src/out
+          # Copy extracted content over the repo (keeps .git)
+          cp -a /tmp/lume-src/out/. .
+          rm -rf .bootstrap
+          ls -la
+
+      - name: Commit extracted source
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: extract full Lume source from bootstrap zip"
+          git push
